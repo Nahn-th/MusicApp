@@ -115,3 +115,85 @@ export const executeSql = async (sql, params = []) => {
         throw error;
     }
 };
+
+// ==================== SONGS ====================
+export const insertSong = async song => {
+    const { title, artist, genre, duration, filePath, albumArt } = song;
+    try {
+        const result = await executeSql(
+            `INSERT INTO songs (title, artist, genre, duration, filePath, albumArt) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+                title,
+                artist || 'Unknown Artist',
+                genre || 'Unknown',
+                duration,
+                filePath,
+                albumArt,
+            ],
+        );
+        return result[0].insertId;
+    } catch (error) {
+        console.error('Error inserting song:', error);
+        throw error;
+    }
+};
+
+export const getAllSongs = async () => {
+    try {
+        const result = await executeSql('SELECT * FROM songs ORDER BY title ASC');
+        return result[0].rows.raw();
+    } catch (error) {
+        console.error('Error getting songs:', error);
+        return [];
+    }
+};
+
+export const searchSongs = async query => {
+    try {
+        const result = await executeSql(
+            'SELECT * FROM songs WHERE title LIKE ? OR artist LIKE ? ORDER BY title ASC',
+            [`%${query}%`, `%${query}%`],
+        );
+        return result[0].rows.raw();
+    } catch (error) {
+        console.error('Error searching songs:', error);
+        return [];
+    }
+};
+
+export const getSongsByGenre = async genre => {
+    try {
+        const result = await executeSql(
+            'SELECT * FROM songs WHERE genre = ? ORDER BY title ASC',
+            [genre],
+        );
+        return result[0].rows.raw();
+    } catch (error) {
+        console.error('Error getting songs by genre:', error);
+        return [];
+    }
+};
+
+export const getSongsByArtist = async artist => {
+    try {
+        const result = await executeSql(
+            'SELECT * FROM songs WHERE artist = ? ORDER BY title ASC',
+            [artist],
+        );
+        return result[0].rows.raw();
+    } catch (error) {
+        console.error('Error getting songs by artist:', error);
+        return [];
+    }
+};
+
+export const deleteSong = async id => {
+    try {
+        await executeSql('DELETE FROM playlist_songs WHERE songId = ?', [id]);
+        await executeSql('DELETE FROM songs WHERE id = ?', [id]);
+    } catch (error) {
+        console.error('Error deleting song:', error);
+        throw error;
+    }
+};
