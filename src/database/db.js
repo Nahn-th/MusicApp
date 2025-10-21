@@ -197,3 +197,112 @@ export const deleteSong = async id => {
         throw error;
     }
 };
+
+// ==================== PLAYLISTS ====================
+export const insertPlaylist = async (
+    name,
+    description = '',
+    coverImage = '🎵',
+) => {
+    try {
+        const result = await executeSql(
+            `INSERT INTO playlists (name, description, coverImage) VALUES (?, ?, ?)`,
+            [name, description, coverImage],
+        );
+        return result[0].insertId;
+    } catch (error) {
+        console.error('Error inserting playlist:', error);
+        throw error;
+    }
+};
+
+export const getAllPlaylists = async () => {
+    try {
+        const result = await executeSql(
+            'SELECT * FROM playlists ORDER BY createdAt DESC',
+        );
+        return result[0].rows.raw();
+    } catch (error) {
+        console.error('Error getting playlists:', error);
+        return [];
+    }
+};
+
+export const searchPlaylists = async query => {
+    try {
+        const result = await executeSql(
+            'SELECT * FROM playlists WHERE name LIKE ? ORDER BY name ASC',
+            [`%${query}%`],
+        );
+        return result[0].rows.raw();
+    } catch (error) {
+        console.error('Error searching playlists:', error);
+        return [];
+    }
+};
+
+export const updatePlaylist = async (id, name, description, coverImage) => {
+    try {
+        await executeSql(
+            `UPDATE playlists SET name = ?, description = ?, coverImage = ? WHERE id = ?`,
+            [name, description, coverImage, id],
+        );
+    } catch (error) {
+        console.error('Error updating playlist:', error);
+        throw error;
+    }
+};
+
+export const deletePlaylist = async id => {
+    try {
+        await executeSql('DELETE FROM playlist_songs WHERE playlistId = ?', [id]);
+        await executeSql('DELETE FROM playlists WHERE id = ?', [id]);
+    } catch (error) {
+        console.error('Error deleting playlist:', error);
+        throw error;
+    }
+};
+
+export const addSongToPlaylist = async (playlistId, songId) => {
+    try {
+        await executeSql(
+            `INSERT INTO playlist_songs (playlistId, songId) VALUES (?, ?)`,
+            [playlistId, songId],
+        );
+    } catch (error) {
+        if (error.message && error.message.includes('UNIQUE constraint')) {
+            console.log('Song already in playlist');
+        } else {
+            console.error('Error adding song to playlist:', error);
+            throw error;
+        }
+    }
+};
+
+export const getPlaylistSongs = async playlistId => {
+    try {
+        const result = await executeSql(
+            `SELECT s.* FROM songs s 
+       INNER JOIN playlist_songs ps ON s.id = ps.songId 
+       WHERE ps.playlistId = ? 
+       ORDER BY ps.addedAt DESC`,
+            [playlistId],
+        );
+        return result[0].rows.raw();
+    } catch (error) {
+        console.error('Error getting playlist songs:', error);
+        return [];
+    }
+};
+
+export const removeSongFromPlaylist = async (playlistId, songId) => {
+    try {
+        await executeSql(
+            'DELETE FROM playlist_songs WHERE playlistId = ? AND songId = ?',
+            [playlistId, songId],
+        );
+    } catch (error) {
+        console.error('Error removing song from playlist:', error);
+        throw error;
+    }
+};
