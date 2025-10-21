@@ -306,3 +306,46 @@ export const removeSongFromPlaylist = async (playlistId, songId) => {
         throw error;
     }
 };
+
+// ==================== SETTINGS ====================
+export const saveSetting = async (key, value) => {
+    try {
+        const existing = await executeSql('SELECT * FROM settings WHERE id = 1');
+        if (existing[0].rows.length === 0) {
+            await executeSql('INSERT INTO settings (id) VALUES (1)');
+        }
+        await executeSql(
+            `UPDATE settings SET ${key} = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = 1`,
+            [value],
+        );
+    } catch (error) {
+        console.error('Error saving setting:', error);
+        throw error;
+    }
+};
+
+export const getSetting = async key => {
+    try {
+        const result = await executeSql('SELECT * FROM settings WHERE id = 1');
+        if (result[0].rows.length === 0) {
+            return null;
+        }
+        return result[0].rows.raw()[0][key];
+    } catch (error) {
+        console.error('Error getting setting:', error);
+        return null;
+    }
+};
+
+export const getAllSettings = async () => {
+    try {
+        const result = await executeSql('SELECT * FROM settings WHERE id = 1');
+        if (result[0].rows.length === 0) {
+            return { theme: 'dark', layout: 'list' };
+        }
+        return result[0].rows.raw()[0];
+    } catch (error) {
+        console.error('Error getting settings:', error);
+        return { theme: 'dark', layout: 'list' };
+    }
+};
