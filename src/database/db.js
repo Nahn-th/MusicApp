@@ -1,402 +1,698 @@
-import SQLite from 'react-native-sqlite-storage';
+import { open } from 'react-native-quick-sqlite';
 
-SQLite.DEBUG(false);
-SQLite.enablePromise(true);
-
-const DB_NAME = 'musicapp.db';
 let db = null;
 
-export const initDatabase = async () => {
-  try {
-    db = await SQLite.openDatabase({
-      name: DB_NAME,
-      location: 'default',
+// Initialize database and create tables
+export const initDatabase = () => {
+    try {
+        db = open({ name: 'musicapp.db' });
+
+        // Table 1: Songs
+        db.execute(`
+      CREATE TABLE IF NOT EXISTS Songs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        artist_name_string TEXT,
+        genre_string TEXT,
+        duration INTEGER,
+        path TEXT NOT NULL UNIQUE,
+        cover_image_path TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+        // Table 2: Artists
+        db.execute(`
+      CREATE TABLE IF NOT EXISTS Artists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        cover_image_path TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+        // Table 3: Genres
+        db.execute(`
+      CREATE TABLE IF NOT EXISTS Genres (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        cover_image_path TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+        // Table 4: Playlists
+        db.execute(`
+      CREATE TABLE IF NOT EXISTS Playlists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        cover_image_path TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+        // Table 5: SongArtists (Many-to-Many)
+        db.execute(`
+      CREATE TABLE IF NOT EXISTS SongArtists (
+        song_id INTEGER,
+        artist_id INTEGER,
+        PRIMARY KEY (song_id, artist_id),
+        FOREIGN KEY (song_id) REFERENCES Songs(id) ON DELETE CASCADE,
+        FOREIGN KEY (artist_id) REFERENCES Artists(id) ON DELETE CASCADE
+      )
+    `);
+
+        // Table 6: SongGenres (Many-to-Many)
+        db.execute(`
+      CREATE TABLE IF NOT EXISTS SongGenres (
+        song_id INTEGER,
+        genre_id INTEGER,
+        PRIMARY KEY (song_id, genre_id),
+        FOREIGN KEY (song_id) REFERENCES Songs(id) ON DELETE CASCADE,
+        FOREIGN KEY (genre_id) REFERENCES Genres(id) ON DELETE CASCADE
+      )
+    `);
+
+        // Table 7: SongPlaylists (Many-to-Many)
+        db.execute(`
+      CREATE TABLE IF NOT EXISTS SongPlaylists (
+        song_id INTEGER,
+        playlist_id INTEGER,
+        position INTEGER,
+        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (song_id, playlist_id),
+        FOREIGN KEY (song_id) REFERENCES Songs(id) ON DELETE CASCADE,
+        FOREIGN KEY (playlist_id) REFERENCES Playlists(id) ON DELETE CASCADE
+      )
+    `);
+
+        // Table 8: PlayHistory
+        db.execute(`
+      CREATE TABLE IF NOT EXISTS PlayHistory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        song_id INTEGER,
+        played_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (song_id) REFERENCES Songs(id) ON DELETE CASCADE
+      )
+    `);
+
+        // Create default genres
+        createDefaultGenres();
+
+        console.log('✅ Database initialized successfully');
+        return true;
+    } catch (error) {
+        console.error('❌ Database initialization error:', error);
+        return false;
+    }
+};
+
+// Create default genres
+const createDefaultGenres = () => {
+    const defaultGenres = [
+        'Rock',
+        'Pop',
+        'Jazz',
+        'Classical',
+        'Hip Hop',
+        'Electronic',
+        'Country',
+        'R&B',
+    ];
+
+    defaultGenres.forEach(genreName => {
+        try {
+            db.execute('INSERT OR IGNORE INTO Genres (name) VALUES (?)', [genreName]);
+        } catch (error) {
+            console.error(`Error creating default genre ${genreName}:`, error);
+        }
     });
-    console.log('✅ Database opened successfully');
-    await createTables();
-    await initializeDefaultData();
-    return db;
-  } catch (error) {
-    console.error('❌ Error opening database:', error);
-    throw error;
-  }
-};
-
-const createTables = async () => {
-  const queries = [
-    `CREATE TABLE IF NOT EXISTS songs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      artist TEXT,
-      genre TEXT,
-      duration INTEGER,
-      filePath TEXT UNIQUE,
-      albumArt TEXT,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS playlists (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      description TEXT,
-      coverImage TEXT,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS playlist_songs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      playlistId INTEGER NOT NULL,
-      songId INTEGER NOT NULL,
-      addedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(playlistId) REFERENCES playlists(id) ON DELETE CASCADE,
-      FOREIGN KEY(songId) REFERENCES songs(id) ON DELETE CASCADE,
-      UNIQUE(playlistId, songId)
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS settings (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      theme TEXT DEFAULT 'dark',
-      layout TEXT DEFAULT 'list',
-      currentSongId INTEGER,
-      currentPlaylistId INTEGER,
-      lastPlaybackTime INTEGER DEFAULT 0,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS genres (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      icon TEXT,
-      color TEXT,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ];
-
-  try {
-    for (const query of queries) {
-      await db.executeSql(query);
-    }
-    console.log('✅ Tables created successfully');
-  } catch (error) {
-    console.error('❌ Error creating tables:', error);
-    throw error;
-  }
-};
-
-const initializeDefaultData = async () => {
-  try {
-    // Initialize settings if not exists
-    const settingsResult = await db.executeSql(
-      'SELECT * FROM settings WHERE id = 1',
-    );
-    if (settingsResult[0].rows.length === 0) {
-      await db.executeSql(
-        'INSERT INTO settings (id, theme, layout) VALUES (1, ?, ?)',
-        ['dark', 'list'],
-      );
-      console.log('✅ Default settings initialized');
-    }
-  } catch (error) {
-    console.error('❌ Error initializing default data:', error);
-  }
-};
-
-export const getDatabase = () => db;
-
-export const executeSql = async (sql, params = []) => {
-  try {
-    if (!db) {
-      throw new Error('Database not initialized');
-    }
-    const result = await db.executeSql(sql, params);
-    return result;
-  } catch (error) {
-    console.error('❌ SQL Error:', error);
-    throw error;
-  }
 };
 
 // ==================== SONGS ====================
-export const insertSong = async song => {
-  const { title, artist, genre, duration, filePath, albumArt } = song;
-  try {
-    const result = await executeSql(
-      `INSERT INTO songs (title, artist, genre, duration, filePath, albumArt) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        title,
-        artist || 'Unknown Artist',
-        genre || 'Unknown',
-        duration,
-        filePath,
-        albumArt,
-      ],
-    );
-    return result[0].insertId;
-  } catch (error) {
-    console.error('Error inserting song:', error);
-    throw error;
-  }
+
+export const getAllSongs = () => {
+    try {
+        const result = db.execute('SELECT * FROM Songs ORDER BY created_at DESC');
+        return result.rows?._array || [];
+    } catch (error) {
+        console.error('Error getting all songs:', error);
+        return [];
+    }
 };
 
-export const getAllSongs = async () => {
-  try {
-    const result = await executeSql('SELECT * FROM songs ORDER BY title ASC');
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error getting songs:', error);
-    return [];
-  }
+export const getSongById = id => {
+    try {
+        const result = db.execute('SELECT * FROM Songs WHERE id = ?', [id]);
+        const rows = result.rows?._array || [];
+        return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+        console.error('Error getting song by id:', error);
+        return null;
+    }
 };
 
-export const searchSongs = async query => {
-  try {
-    const result = await executeSql(
-      'SELECT * FROM songs WHERE title LIKE ? OR artist LIKE ? ORDER BY title ASC',
-      [`%${query}%`, `%${query}%`],
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error searching songs:', error);
-    return [];
-  }
+export const insertSong = song => {
+    try {
+        const {
+            title,
+            artist_name_string,
+            genre_string,
+            duration,
+            path,
+            cover_image_path,
+        } = song;
+
+        // Check if song already exists
+        try {
+            const checkResult = db.execute('SELECT id FROM Songs WHERE path = ?', [
+                path,
+            ]);
+            const existingRows = checkResult.rows?._array || [];
+            if (existingRows.length > 0) {
+                return existingRows[0].id;
+            }
+        } catch (checkError) {
+            // Continue to insert
+        }
+
+        // Insert new song
+        db.execute(
+            'INSERT INTO Songs (title, artist_name_string, genre_string, duration, path, cover_image_path) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+                title,
+                artist_name_string || '',
+                genre_string || '',
+                duration || 0,
+                path,
+                cover_image_path || '',
+            ],
+        );
+
+        // Get inserted ID - Quick SQLite returns it directly
+        const result = db.execute('SELECT last_insert_rowid() as id');
+        const rows = result.rows?._array || [];
+        const insertedId = rows.length > 0 ? rows[0].id : null;
+
+        if (insertedId) {
+            console.log(`✅ Inserted: ${title} (id: ${insertedId})`);
+        }
+
+        return insertedId;
+    } catch (error) {
+        console.error('❌ Error inserting song:', error.message);
+        return null;
+    }
 };
 
-export const getSongsByGenre = async genre => {
-  try {
-    const result = await executeSql(
-      'SELECT * FROM songs WHERE genre = ? ORDER BY title ASC',
-      [genre],
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error getting songs by genre:', error);
-    return [];
-  }
+export const updateSong = (id, updates) => {
+    try {
+        const { title, cover_image_path, artist_name_string, genre_string } =
+            updates;
+        const fields = [];
+        const values = [];
+
+        if (title !== undefined) {
+            fields.push('title = ?');
+            values.push(title);
+        }
+        if (cover_image_path !== undefined) {
+            fields.push('cover_image_path = ?');
+            values.push(cover_image_path);
+        }
+        if (artist_name_string !== undefined) {
+            fields.push('artist_name_string = ?');
+            values.push(artist_name_string);
+        }
+        if (genre_string !== undefined) {
+            fields.push('genre_string = ?');
+            values.push(genre_string);
+        }
+
+        if (fields.length === 0) return false;
+
+        values.push(id);
+        db.execute(`UPDATE Songs SET ${fields.join(', ')} WHERE id = ?`, values);
+        return true;
+    } catch (error) {
+        console.error('Error updating song:', error);
+        return false;
+    }
 };
 
-export const getSongsByArtist = async artist => {
-  try {
-    const result = await executeSql(
-      'SELECT * FROM songs WHERE artist = ? ORDER BY title ASC',
-      [artist],
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error getting songs by artist:', error);
-    return [];
-  }
+export const deleteSong = id => {
+    try {
+        db.execute('DELETE FROM Songs WHERE id = ?', [id]);
+        return true;
+    } catch (error) {
+        console.error('Error deleting song:', error);
+        return false;
+    }
 };
 
-export const deleteSong = async id => {
-  try {
-    await executeSql('DELETE FROM playlist_songs WHERE songId = ?', [id]);
-    await executeSql('DELETE FROM songs WHERE id = ?', [id]);
-  } catch (error) {
-    console.error('Error deleting song:', error);
-    throw error;
-  }
+export const searchSongs = query => {
+    try {
+        const searchTerm = `%${query}%`;
+        const result = db.execute(
+            'SELECT * FROM Songs WHERE title LIKE ? OR artist_name_string LIKE ? ORDER BY title',
+            [searchTerm, searchTerm],
+        );
+        return result.rows?._array || [];
+    } catch (error) {
+        console.error('Error searching songs:', error);
+        return [];
+    }
 };
 
 // ==================== PLAYLISTS ====================
-export const insertPlaylist = async (
-  name,
-  description = '',
-  coverImage = '🎵',
-) => {
-  try {
-    const result = await executeSql(
-      `INSERT INTO playlists (name, description, coverImage) VALUES (?, ?, ?)`,
-      [name, description, coverImage],
-    );
-    return result[0].insertId;
-  } catch (error) {
-    console.error('Error inserting playlist:', error);
-    throw error;
-  }
-};
 
-export const getAllPlaylists = async () => {
-  try {
-    const result = await executeSql(
-      'SELECT * FROM playlists ORDER BY createdAt DESC',
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error getting playlists:', error);
-    return [];
-  }
-};
-
-export const searchPlaylists = async query => {
-  try {
-    const result = await executeSql(
-      'SELECT * FROM playlists WHERE name LIKE ? ORDER BY name ASC',
-      [`%${query}%`],
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error searching playlists:', error);
-    return [];
-  }
-};
-
-export const updatePlaylist = async (id, name, description, coverImage) => {
-  try {
-    await executeSql(
-      `UPDATE playlists SET name = ?, description = ?, coverImage = ? WHERE id = ?`,
-      [name, description, coverImage, id],
-    );
-  } catch (error) {
-    console.error('Error updating playlist:', error);
-    throw error;
-  }
-};
-
-export const deletePlaylist = async id => {
-  try {
-    await executeSql('DELETE FROM playlist_songs WHERE playlistId = ?', [id]);
-    await executeSql('DELETE FROM playlists WHERE id = ?', [id]);
-  } catch (error) {
-    console.error('Error deleting playlist:', error);
-    throw error;
-  }
-};
-
-export const addSongToPlaylist = async (playlistId, songId) => {
-  try {
-    await executeSql(
-      `INSERT INTO playlist_songs (playlistId, songId) VALUES (?, ?)`,
-      [playlistId, songId],
-    );
-  } catch (error) {
-    if (error.message && error.message.includes('UNIQUE constraint')) {
-      console.log('Song already in playlist');
-    } else {
-      console.error('Error adding song to playlist:', error);
-      throw error;
+export const getAllPlaylists = () => {
+    try {
+        const result = db.execute(
+            'SELECT * FROM Playlists ORDER BY created_at DESC',
+        );
+        return result.rows?._array || [];
+    } catch (error) {
+        console.error('Error getting all playlists:', error);
+        return [];
     }
-  }
 };
 
-export const getPlaylistSongs = async playlistId => {
-  try {
-    const result = await executeSql(
-      `SELECT s.* FROM songs s 
-       INNER JOIN playlist_songs ps ON s.id = ps.songId 
-       WHERE ps.playlistId = ? 
-       ORDER BY ps.addedAt DESC`,
-      [playlistId],
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error getting playlist songs:', error);
-    return [];
-  }
-};
-
-export const removeSongFromPlaylist = async (playlistId, songId) => {
-  try {
-    await executeSql(
-      'DELETE FROM playlist_songs WHERE playlistId = ? AND songId = ?',
-      [playlistId, songId],
-    );
-  } catch (error) {
-    console.error('Error removing song from playlist:', error);
-    throw error;
-  }
-};
-
-// ==================== SETTINGS ====================
-export const saveSetting = async (key, value) => {
-  try {
-    const existing = await executeSql('SELECT * FROM settings WHERE id = 1');
-    if (existing[0].rows.length === 0) {
-      await executeSql('INSERT INTO settings (id) VALUES (1)');
+export const getPlaylistById = id => {
+    try {
+        const result = db.execute('SELECT * FROM Playlists WHERE id = ?', [id]);
+        const rows = result.rows?._array || [];
+        return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+        console.error('Error getting playlist by id:', error);
+        return null;
     }
-    await executeSql(
-      `UPDATE settings SET ${key} = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = 1`,
-      [value],
-    );
-  } catch (error) {
-    console.error('Error saving setting:', error);
-    throw error;
-  }
 };
 
-export const getSetting = async key => {
-  try {
-    const result = await executeSql('SELECT * FROM settings WHERE id = 1');
-    if (result[0].rows.length === 0) {
-      return null;
+export const createPlaylist = (name, cover_image_path = '') => {
+    try {
+        db.execute('INSERT INTO Playlists (name, cover_image_path) VALUES (?, ?)', [
+            name,
+            cover_image_path,
+        ]);
+        const result = db.execute('SELECT last_insert_rowid() as id');
+        const rows = result.rows?._array || [];
+        return rows.length > 0 ? rows[0].id : null;
+    } catch (error) {
+        console.error('Error creating playlist:', error);
+        return null;
     }
-    return result[0].rows.raw()[0][key];
-  } catch (error) {
-    console.error('Error getting setting:', error);
-    return null;
-  }
 };
 
-export const getAllSettings = async () => {
-  try {
-    const result = await executeSql('SELECT * FROM settings WHERE id = 1');
-    if (result[0].rows.length === 0) {
-      return { theme: 'dark', layout: 'list' };
+export const updatePlaylist = (id, name, cover_image_path) => {
+    try {
+        const fields = [];
+        const values = [];
+
+        if (name !== undefined) {
+            fields.push('name = ?');
+            values.push(name);
+        }
+        if (cover_image_path !== undefined) {
+            fields.push('cover_image_path = ?');
+            values.push(cover_image_path);
+        }
+
+        if (fields.length === 0) return false;
+
+        values.push(id);
+        db.execute(
+            `UPDATE Playlists SET ${fields.join(', ')} WHERE id = ?`,
+            values,
+        );
+        return true;
+    } catch (error) {
+        console.error('Error updating playlist:', error);
+        return false;
     }
-    return result[0].rows.raw()[0];
-  } catch (error) {
-    console.error('Error getting settings:', error);
-    return { theme: 'dark', layout: 'list' };
-  }
 };
 
-// ==================== GENRES & ARTISTS ====================
-export const getAllGenres = async () => {
-  try {
-    const result = await executeSql(
-      'SELECT DISTINCT genre as name, COUNT(*) as count FROM songs GROUP BY genre ORDER BY genre ASC',
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error getting genres:', error);
-    return [];
-  }
+export const deletePlaylist = id => {
+    try {
+        db.execute('DELETE FROM Playlists WHERE id = ?', [id]);
+        return true;
+    } catch (error) {
+        console.error('Error deleting playlist:', error);
+        return false;
+    }
 };
 
-export const getAllArtists = async () => {
-  try {
-    const result = await executeSql(
-      'SELECT DISTINCT artist as name, COUNT(*) as count FROM songs GROUP BY artist ORDER BY artist ASC',
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error getting artists:', error);
-    return [];
-  }
+export const searchPlaylists = query => {
+    try {
+        const searchTerm = `%${query}%`;
+        const result = db.execute(
+            'SELECT * FROM Playlists WHERE name LIKE ? ORDER BY name',
+            [searchTerm],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error searching playlists:', error);
+        return [];
+    }
 };
 
-export const searchGenres = async query => {
-  try {
-    const result = await executeSql(
-      'SELECT DISTINCT genre as name, COUNT(*) as count FROM songs WHERE genre LIKE ? GROUP BY genre ORDER BY genre ASC',
-      [`%${query}%`],
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error searching genres:', error);
-    return [];
-  }
+export const getSongsByPlaylist = playlistId => {
+    try {
+        const result = db.execute(
+            `SELECT s.*, sp.position 
+       FROM Songs s 
+       INNER JOIN SongPlaylists sp ON s.id = sp.song_id 
+       WHERE sp.playlist_id = ? 
+       ORDER BY sp.position`,
+            [playlistId],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error getting songs by playlist:', error);
+        return [];
+    }
 };
 
-export const searchArtists = async query => {
-  try {
-    const result = await executeSql(
-      'SELECT DISTINCT artist as name, COUNT(*) as count FROM songs WHERE artist LIKE ? GROUP BY artist ORDER BY artist ASC',
-      [`%${query}%`],
-    );
-    return result[0].rows.raw();
-  } catch (error) {
-    console.error('Error searching artists:', error);
-    return [];
-  }
+// ==================== ARTISTS ====================
+
+export const getAllArtists = () => {
+    try {
+        const result = db.execute('SELECT * FROM Artists ORDER BY name');
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error getting all artists:', error);
+        return [];
+    }
+};
+
+export const getArtistById = id => {
+    try {
+        const result = db.execute('SELECT * FROM Artists WHERE id = ?', [id]);
+        const rows = result.rows?._array || result.rows || [];
+        return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+        console.error('Error getting artist by id:', error);
+        return null;
+    }
+};
+
+export const createArtist = (name, cover_image_path = '') => {
+    try {
+        db.execute(
+            'INSERT OR IGNORE INTO Artists (name, cover_image_path) VALUES (?, ?)',
+            [name, cover_image_path],
+        );
+        const result = db.execute('SELECT id FROM Artists WHERE name = ?', [name]);
+        const rows = result.rows?._array || result.rows || [];
+        return rows.length > 0 ? rows[0].id : null;
+    } catch (error) {
+        console.error('Error creating artist:', error);
+        return null;
+    }
+};
+
+export const searchArtists = query => {
+    try {
+        const searchTerm = `%${query}%`;
+        const result = db.execute(
+            'SELECT * FROM Artists WHERE name LIKE ? ORDER BY name',
+            [searchTerm],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error searching artists:', error);
+        return [];
+    }
+};
+
+export const getSongsByArtist = artistId => {
+    try {
+        const result = db.execute(
+            `SELECT s.* 
+       FROM Songs s 
+       INNER JOIN SongArtists sa ON s.id = sa.song_id 
+       WHERE sa.artist_id = ? 
+       ORDER BY s.title`,
+            [artistId],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error getting songs by artist:', error);
+        return [];
+    }
+};
+
+export const getArtistsBySong = songId => {
+    try {
+        const result = db.execute(
+            `SELECT a.* 
+       FROM Artists a 
+       INNER JOIN SongArtists sa ON a.id = sa.artist_id 
+       WHERE sa.song_id = ?`,
+            [songId],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error getting artists by song:', error);
+        return [];
+    }
+};
+
+// ==================== GENRES ====================
+
+export const getAllGenres = () => {
+    try {
+        const result = db.execute('SELECT * FROM Genres ORDER BY name');
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error getting all genres:', error);
+        return [];
+    }
+};
+
+export const getGenreById = id => {
+    try {
+        const result = db.execute('SELECT * FROM Genres WHERE id = ?', [id]);
+        const rows = result.rows?._array || result.rows || [];
+        return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+        console.error('Error getting genre by id:', error);
+        return null;
+    }
+};
+
+export const createGenre = (name, cover_image_path = '') => {
+    try {
+        db.execute(
+            'INSERT OR IGNORE INTO Genres (name, cover_image_path) VALUES (?, ?)',
+            [name, cover_image_path],
+        );
+        const result = db.execute('SELECT id FROM Genres WHERE name = ?', [name]);
+        const rows = result.rows?._array || result.rows || [];
+        return rows.length > 0 ? rows[0].id : null;
+    } catch (error) {
+        console.error('Error creating genre:', error);
+        return null;
+    }
+};
+
+export const updateGenre = (id, name, cover_image_path) => {
+    try {
+        const fields = [];
+        const values = [];
+
+        if (name !== undefined) {
+            fields.push('name = ?');
+            values.push(name);
+        }
+        if (cover_image_path !== undefined) {
+            fields.push('cover_image_path = ?');
+            values.push(cover_image_path);
+        }
+
+        if (fields.length === 0) return false;
+
+        values.push(id);
+        db.execute(`UPDATE Genres SET ${fields.join(', ')} WHERE id = ?`, values);
+        return true;
+    } catch (error) {
+        console.error('Error updating genre:', error);
+        return false;
+    }
+};
+
+export const deleteGenre = id => {
+    try {
+        db.execute('DELETE FROM Genres WHERE id = ?', [id]);
+        return true;
+    } catch (error) {
+        console.error('Error deleting genre:', error);
+        return false;
+    }
+};
+
+export const searchGenres = query => {
+    try {
+        const searchTerm = `%${query}%`;
+        const result = db.execute(
+            'SELECT * FROM Genres WHERE name LIKE ? ORDER BY name',
+            [searchTerm],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error searching genres:', error);
+        return [];
+    }
+};
+
+export const getSongsByGenre = genreId => {
+    try {
+        const result = db.execute(
+            `SELECT s.* 
+       FROM Songs s 
+       INNER JOIN SongGenres sg ON s.id = sg.song_id 
+       WHERE sg.genre_id = ? 
+       ORDER BY s.title`,
+            [genreId],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error getting songs by genre:', error);
+        return [];
+    }
+};
+
+export const getGenresBySong = songId => {
+    try {
+        const result = db.execute(
+            `SELECT g.* 
+       FROM Genres g 
+       INNER JOIN SongGenres sg ON g.id = sg.genre_id 
+       WHERE sg.song_id = ?`,
+            [songId],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error getting genres by song:', error);
+        return [];
+    }
+};
+
+// ==================== RELATIONSHIPS ====================
+
+export const addSongToPlaylist = (songId, playlistId, position = 0) => {
+    try {
+        db.execute(
+            'INSERT OR REPLACE INTO SongPlaylists (song_id, playlist_id, position) VALUES (?, ?, ?)',
+            [songId, playlistId, position],
+        );
+        return true;
+    } catch (error) {
+        console.error('Error adding song to playlist:', error);
+        return false;
+    }
+};
+
+export const removeSongFromPlaylist = (songId, playlistId) => {
+    try {
+        db.execute(
+            'DELETE FROM SongPlaylists WHERE song_id = ? AND playlist_id = ?',
+            [songId, playlistId],
+        );
+        return true;
+    } catch (error) {
+        console.error('Error removing song from playlist:', error);
+        return false;
+    }
+};
+
+export const linkSongArtist = (songId, artistId) => {
+    try {
+        db.execute(
+            'INSERT OR IGNORE INTO SongArtists (song_id, artist_id) VALUES (?, ?)',
+            [songId, artistId],
+        );
+        return true;
+    } catch (error) {
+        console.error('Error linking song to artist:', error);
+        return false;
+    }
+};
+
+export const unlinkSongArtist = (songId, artistId) => {
+    try {
+        db.execute('DELETE FROM SongArtists WHERE song_id = ? AND artist_id = ?', [
+            songId,
+            artistId,
+        ]);
+        return true;
+    } catch (error) {
+        console.error('Error unlinking song from artist:', error);
+        return false;
+    }
+};
+
+export const linkSongGenre = (songId, genreId) => {
+    try {
+        db.execute(
+            'INSERT OR IGNORE INTO SongGenres (song_id, genre_id) VALUES (?, ?)',
+            [songId, genreId],
+        );
+        return true;
+    } catch (error) {
+        console.error('Error linking song to genre:', error);
+        return false;
+    }
+};
+
+export const unlinkSongGenre = (songId, genreId) => {
+    try {
+        db.execute('DELETE FROM SongGenres WHERE song_id = ? AND genre_id = ?', [
+            songId,
+            genreId,
+        ]);
+        return true;
+    } catch (error) {
+        console.error('Error unlinking song from genre:', error);
+        return false;
+    }
+};
+
+// ==================== PLAY HISTORY ====================
+
+export const addSongToHistory = songId => {
+    try {
+        db.execute('INSERT INTO PlayHistory (song_id) VALUES (?)', [songId]);
+        return true;
+    } catch (error) {
+        console.error('Error adding song to history:', error);
+        return false;
+    }
+};
+
+export const getPlayHistory = (limit = 100) => {
+    try {
+        const result = db.execute(
+            `SELECT s.*, ph.played_at 
+       FROM Songs s 
+       INNER JOIN PlayHistory ph ON s.id = ph.song_id 
+       ORDER BY ph.played_at DESC 
+       LIMIT ?`,
+            [limit],
+        );
+        return result.rows?._array || result.rows || [];
+    } catch (error) {
+        console.error('Error getting play history:', error);
+        return [];
+    }
+};
+
+export const clearPlayHistory = () => {
+    try {
+        db.execute('DELETE FROM PlayHistory');
+        return true;
+    } catch (error) {
+        console.error('Error clearing play history:', error);
+        return false;
+    }
 };
