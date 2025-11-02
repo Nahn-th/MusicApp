@@ -8,6 +8,7 @@ import {
     SafeAreaView,
     Alert,
     PermissionsAndroid,
+    ActionSheetIOS,
     Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -30,6 +31,11 @@ import {
     getAllGenres,
     linkSongGenre,
 } from '../database/db';
+import {
+    createArtist,
+    linkSongArtist,
+    getAllArtists,
+} from '../database/autoCreateArtists';
 
 const SongsScreen = () => {
     const { colors, layout, playSong, playShuffled } = useApp();
@@ -202,28 +208,55 @@ const SongsScreen = () => {
     };
 
     const handleLongPress = song => {
-        Alert.alert(song.title, 'Choose an action', [
-            {
-                text: 'Add to Playlist',
-                onPress: () => handleAddToPlaylist(song),
-            },
-            {
-                text: 'Add to Genre',
-                onPress: () => handleAddToGenre(song),
-            },
-            {
-                text: 'Edit Song Info',
-                onPress: () => handleEditSongInfo(song),
-            },
+        const options = [
+            { text: 'Add to Playlist', onPress: () => handleAddToPlaylist(song) },
+            { text: 'Add to Genre', onPress: () => handleAddToGenre(song) },
+            { text: 'Edit Song Info', onPress: () => handleEditSongInfo(song) },
             {
                 text: 'Delete',
                 onPress: () => handleDeleteSong(song),
                 style: 'destructive',
             },
             { text: 'Cancel', style: 'cancel' },
-        ]);
-    };
+        ];
 
+        if (Platform.OS === 'ios') {
+            // Dùng ActionSheet đẹp hơn trên iOS
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    title: song.title,
+                    options: options.map(o => o.text),
+                    destructiveButtonIndex: 3,
+                    cancelButtonIndex: 4,
+                },
+                buttonIndex => {
+                    const selected = options[buttonIndex];
+                    if (selected?.onPress) selected.onPress();
+                },
+            );
+        } else {
+            // Dùng Alert trên Android nhưng chia nhỏ chức năng
+            Alert.alert(
+                song.title,
+                'Choose an action',
+                options.slice(0, 3).concat([
+                    {
+                        text: 'More...',
+                        onPress: () => {
+                            Alert.alert(song.title, 'More options', [
+                                {
+                                    text: 'Delete',
+                                    onPress: () => handleDeleteSong(song),
+                                    style: 'destructive',
+                                },
+                                { text: 'Cancel', style: 'cancel' },
+                            ]);
+                        },
+                    },
+                ]),
+            );
+        }
+    };
     // ============ NEW HANDLERS WITH MODALS ============
 
     // Mở SelectionModal cho Playlist
@@ -299,7 +332,7 @@ const SongsScreen = () => {
         const success = updateSong(selectedSong.id, {
             title: updatedSong.title,
             artist_name_string: updatedSong.artist || 'Unknown Artist',
-            // Thêm các fields khác nếu cần
+            cover_image_path: updatedSong.cover_image_path,
         });
 
         if (success) {
@@ -535,3 +568,91 @@ const styles = StyleSheet.create({
 });
 
 export default SongsScreen;
+
+// export const createArtistsFromString = artistNameString => {
+//     if (!artistNameString || artistNameString.trim() === '') {
+//         return [];
+//     }
+//
+//     // Split artists by common separators
+//     const separators = /[&,]|feat\.?|ft\.?|featuring/i;
+//     const artistNames = artistNameString
+//         .split(separators)
+//         .map(name => name.trim())
+//         .filter(name => name && name.toLowerCase() !== 'unknown artist');
+//
+//     const artistIds = [];
+//
+//     for (const artistName of artistNames) {
+//         if (artistName) {
+//             const artistId = createArtist(artistName, ''); // Empty cover_image_path
+//             if (artistId) {
+//                 artistIds.push(artistId);
+//             }
+//         }
+//     }
+//
+//     return artistIds;
+// };
+//
+// export const linkSongWithArtists = (songId, artistNameString) => {
+//     const artistIds = createArtistsFromString(artistNameString);
+//
+//     for (const artistId of artistIds) {
+//         linkSongArtist(songId, artistId);
+//     }
+//
+//     return artistIds;
+// };
+//
+// export const syncAllSongsWithArtists = () => {
+//     const songs = getAllSongs();
+//     let createdArtistsCount = 0;
+//     let linkedCount = 0;
+//
+//     for (const song of songs) {
+//         if (song.artist_name_string && song.artist_name_string.trim() !== '') {
+//             const artistIds = linkSongWithArtists(song.id, song.artist_name_string);
+//             if (artistIds.length > 0) {
+//                 createdArtistsCount += artistIds.length;
+//                 linkedCount++;
+//             }
+//         }
+//     }
+//
+//     console.log(
+//         ` Synced ${linkedCount} songs with ${createdArtistsCount} artists`,
+//     );
+//
+//     return {
+//         songsLinked: linkedCount,
+//         artistsCreated: createdArtistsCount,
+//     };
+// };
+//
+// export const cleanupEmptyArtists = () => { };
+//
+// export const getPrimaryArtistName = song => {
+//     if (!song || !song.artist_name_string) {
+//         return 'Unknown Artist';
+//     }
+//
+//     const separators = /[&,]|feat\.?|ft\.?|featuring/i;
+//     const artists = song.artist_name_string.split(separators);
+//
+//     return artists[0]?.trim() || 'Unknown Artist';
+// };
+//
+// export const formatArtistString = artistNameString => {
+//     if (!artistNameString || artistNameString.trim() === '') {
+//         return 'Unknown Artist';
+//     }
+//
+//     // Replace common separators with consistent format
+//     return artistNameString
+//         .replace(/feat\.?/gi, 'feat.')
+//         .replace(/ft\.?/gi, 'feat.')
+//         .replace(/featuring/gi, 'feat.')
+//         .replace(/\s+/g, ' ')
+//         .trim();
+// };
