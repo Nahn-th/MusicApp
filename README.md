@@ -149,21 +149,9 @@ adb devices
 
 ## 🧑‍💻 Tác giả
 
-**<Tên bạn>**
-📧 <email hoặc github của bạn>
-💡 “Code là âm nhạc, còn lỗi là nốt trầm.”
+**Nahn**
+📧 <nhanteo258@gmail.com>
+💡 “Vibe coder”
 
 ---
-
-## 📜 Giấy phép
-
-Dự án này được phát hành theo giấy phép **MIT** — bạn có thể tự do sử dụng, chỉnh sửa và phân phối.
-
-```
-
----
-
-Bạn có muốn mình bổ sung thêm **hướng dẫn cấu hình SQLite (react-native-sqlite-storage)** trong phần cài đặt không?  
-Nếu có, mình sẽ chèn luôn phần setup DB và cách tạo bảng `songs`, `artists` để README hoàn chỉnh hơn.
-```
 
