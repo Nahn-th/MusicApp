@@ -151,8 +151,8 @@ const SongsScreen = () => {
 
       if (foundFiles.length === 0) {
         Alert.alert(
-          'No Music Found',
-          'No music files found. Please ensure you have MP3, M4A, WAV, FLAC, or AAC files on your device.',
+          'Khong tim thay nhac',
+          'Khong tim thay nhac. Dam bao ban co MP3, M4A, WAV, FLAC, or AAC files tren thiet bi.',
         );
         setIsScanning(false);
         return;

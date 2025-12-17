@@ -109,11 +109,11 @@ const SettingsScreen = () => {
 
         <SettingItem title="Version" subtitle="1.0.0" />
 
-        <SettingItem title="Developer" subtitle="Music Player Team" />
+        <SettingItem title="Developer" subtitle="SangNhanThe Team" />
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-            Made with ❤️ for music lovers
+            Made with love
           </Text>
         </View>
       </ScrollView>

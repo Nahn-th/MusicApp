@@ -17,7 +17,7 @@ import SearchBar from '../components/SearchBar';
 import SettingsIcon from '../components/SettingsIcon';
 import MiniPlayer from '../components/MiniPlayer';
 
-// FREE, khong can API key
+// Free, khong can API key
 const DEEZER_API = 'https://api.deezer.com';
 
 const OnlineMusicScreen = () => {
@@ -43,7 +43,7 @@ const OnlineMusicScreen = () => {
       
       if (data && data.data) {
         setSongs(data.data);
-        console.log(`✅ Loaded ${data.data.length} hot songs`);
+        console.log(`Loaded ${data.data.length} hot songs`);
       }
     } catch (err) {
       console.error('Error loading hot songs:', err);

@@ -166,6 +166,55 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  
+const playOnlineSong = (song) => {
+  try {
+    console.log('Playing online preview:', song.preview);
+
+    if (!song.preview) return;
+
+    if (soundRef.current) {
+      soundRef.current.stop();
+      soundRef.current.release();
+      stopProgressTracking();
+    }
+
+    const sound = new Sound(song.preview, '', (error) => {
+      console.log('Sound load callback fired');
+
+      if (error) {
+        console.error('Failed to load online sound:', error);
+        return;
+      }
+
+      console.log('Online sound loaded');
+
+      const duration = sound.getDuration();
+      setProgress({ position: 0, duration });
+
+      setCurrentTrack({
+        title: song.title,
+        artist: song.artist?.name,
+        artwork: song.album?.cover_medium,
+        isOnline: true,
+      });
+
+      sound.play((success) => {
+        console.log('Play finished:', success);
+        setIsPlaying(false);
+        stopProgressTracking();
+      });
+
+      setIsPlaying(true);
+      startProgressTracking(sound);
+    });
+
+    soundRef.current = sound;
+  } catch (e) {
+    console.error('playOnlineSong error:', e);
+  }
+};
+
   const handleSongEnd = () => {
     stopProgressTracking();
 
@@ -283,6 +332,7 @@ export const AppProvider = ({ children }) => {
 
     // Playback Controls
     playSong,
+    playOnlineSong,
     pause,
     resume,
     togglePlayPause,
