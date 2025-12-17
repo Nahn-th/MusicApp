@@ -411,6 +411,42 @@ export const createArtist = (name, cover_image_path = '') => {
     }
 };
 
+export const updateArtist = (id, updates) => {
+  try {
+    const { name, cover_image_path } = updates;
+    const fields = [];
+    const values = [];
+
+    if (name !== undefined) {
+      fields.push('name = ?');
+      values.push(name);
+    }
+    if (cover_image_path !== undefined) {
+      fields.push('cover_image_path = ?');
+      values.push(cover_image_path);
+    }
+
+    if (fields.length === 0) return false;
+
+    values.push(id);
+    db.execute(`UPDATE Artists SET ${fields.join(', ')} WHERE id = ?`, values);
+    return true;
+  } catch (error) {
+    console.error('Error updating artist:', error);
+    return false;
+  }
+};
+
+export const deleteArtist = id => {
+  try {
+    db.execute('DELETE FROM Artists WHERE id = ?', [id]);
+    return true;
+  } catch (error) {
+    console.error('Error deleting artist:', error);
+    return false;
+  }
+};
+
 export const searchArtists = query => {
     try {
         const searchTerm = `%${query}%`;

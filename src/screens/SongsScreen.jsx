@@ -569,6 +569,17 @@ const styles = StyleSheet.create({
 
 export default SongsScreen;
 
+export const getPrimaryArtistName = song => {
+    if (!song || !song.artist_name_string) {
+        return 'Unknown Artist';
+    }
+
+    const separators = /[&,]|feat\.?|ft\.?|featuring/i;
+    const artists = song.artist_name_string.split(separators);
+
+    return artists[0]?.trim() || 'Unknown Artist';
+};
+
 // export const createArtistsFromString = artistNameString => {
 //     if (!artistNameString || artistNameString.trim() === '') {
 //         return [];
@@ -632,16 +643,6 @@ export default SongsScreen;
 //
 // export const cleanupEmptyArtists = () => { };
 //
-// export const getPrimaryArtistName = song => {
-//     if (!song || !song.artist_name_string) {
-//         return 'Unknown Artist';
-//     }
-//
-//     const separators = /[&,]|feat\.?|ft\.?|featuring/i;
-//     const artists = song.artist_name_string.split(separators);
-//
-//     return artists[0]?.trim() || 'Unknown Artist';
-// };
 //
 // export const formatArtistString = artistNameString => {
 //     if (!artistNameString || artistNameString.trim() === '') {
