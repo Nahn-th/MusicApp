@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
 import SongItem from '../components/SongItem';
 import MiniPlayer from '../components/MiniPlayer';
@@ -34,48 +34,43 @@ const ArtistDetailScreen = () => {
   const [showAddSongsModal, setShowAddSongsModal] = useState(false);
   const [availableSongs, setAvailableSongs] = useState([]);
 
-  useEffect(() => {
-    loadSongs();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadSongs();
+    }, [artist.id])
+  );
 
   const loadSongs = () => {
     const artistSongs = getSongsByArtist(artist.id);
     setSongs(artistSongs);
+    console.log(`Loaded ${artistSongs.length} songs for artist ${artist.name}`);
   };
 
   const loadAvailableSongs = () => {
-    // Lấy tất cả songs
     const allSongs = getAllSongs();
-    
-    // Lấy songs đã có trong artist này
     const artistSongIds = songs.map(s => s.id);
-    
-    // Filter ra songs chưa có trong artist
     const available = allSongs
       .filter(s => !artistSongIds.includes(s.id))
       .map(s => ({
         id: s.id,
-        name: s.title, // SelectionModal cần field 'name'
+        name: s.title,
       }));
     
     setAvailableSongs(available);
   };
 
-  // ============ ADD SONGS ============
   const handleAddSongs = () => {
     loadAvailableSongs();
     setShowAddSongsModal(true);
   };
 
   const handleSelectSongs = selectedSong => {
-    // Link song với artist
     const success = linkSongArtist(selectedSong.id, artist.id);
     
     if (success) {
-      // Update artist_name_string của song
       updateSongArtistString(selectedSong.id);
-      
       Alert.alert('Success', `Added "${selectedSong.name}" to ${artist.name}`);
+      
       loadSongs();
     } else {
       Alert.alert('Error', 'Failed to add song');
@@ -84,23 +79,13 @@ const ArtistDetailScreen = () => {
     setShowAddSongsModal(false);
   };
 
-  // ============ UPDATE ARTIST_NAME_STRING ============
   const updateSongArtistString = songId => {
-    // Lấy tất cả artists của song này
     const songArtists = getArtistsBySong(songId);
-    
-    // Join artist names thành string
-    const artistNameString = songArtists
-      .map(a => a.name)
-      .join(' & ');
-    
-    // Update song
+    const artistNameString = songArtists.map(a => a.name).join(' & ');
     updateSong(songId, { artist_name_string: artistNameString });
-    
-    console.log(`Updated song ${songId} artist_name_string: "${artistNameString}"`);
+    console.log(`✅ Updated song ${songId} artist_name_string: "${artistNameString}"`);
   };
 
-  // ============ REMOVE SONG ============
   const handleRemoveSong = song => {
     Alert.alert(
       'Remove Song',
@@ -114,10 +99,9 @@ const ArtistDetailScreen = () => {
             const success = unlinkSongArtist(song.id, artist.id);
             
             if (success) {
-              // Update artist_name_string của song
               updateSongArtistString(song.id);
-              
               Alert.alert('Success', 'Song removed from artist');
+              
               loadSongs();
             } else {
               Alert.alert('Error', 'Failed to remove song');
@@ -128,7 +112,6 @@ const ArtistDetailScreen = () => {
     );
   };
 
-  // ============ PLAYBACK ============
   const handleSongPress = song => {
     playSong(song, songs);
   };
@@ -145,10 +128,8 @@ const ArtistDetailScreen = () => {
     }
   };
 
-  // ============ RENDER ============
   const renderHeader = () => (
     <View>
-      {/* Artist Info */}
       <View style={styles.artistHeader}>
         {artist.cover_image_path ? (
           <Image
@@ -175,7 +156,6 @@ const ArtistDetailScreen = () => {
         </Text>
       </View>
 
-      {/* Action Buttons */}
       {songs.length > 0 && (
         <View style={styles.buttonContainer}>
           <TouchableOpacity
@@ -196,7 +176,6 @@ const ArtistDetailScreen = () => {
         </View>
       )}
 
-      {/* Add Songs Button */}
       <TouchableOpacity
         style={[styles.addSongsButton, { backgroundColor: colors.surface }]}
         onPress={handleAddSongs}
@@ -233,7 +212,6 @@ const ArtistDetailScreen = () => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
           style={styles.backButton}
@@ -247,7 +225,6 @@ const ArtistDetailScreen = () => {
         <View style={styles.headerRight} />
       </View>
 
-      {/* Songs List */}
       <FlatList
         data={songs}
         keyExtractor={item => String(item.id)}
@@ -266,7 +243,6 @@ const ArtistDetailScreen = () => {
 
       <MiniPlayer />
 
-      {/* Add Songs Modal */}
       <SelectionModal
         visible={showAddSongsModal}
         title="Add Songs"
@@ -298,7 +274,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   headerRight: {
-    width: 36, // Same width as back button for centering
+    width: 36,
   },
   artistHeader: {
     alignItems: 'center',
@@ -392,89 +368,3 @@ const styles = StyleSheet.create({
 });
 
 export default ArtistDetailScreen;
-
-/*
-===============================================
-FEATURES
-===============================================
-
-✅ Hiển thị artist info (ảnh, tên, số bài hát)
-✅ Danh sách songs của artist
-✅ Play/Shuffle songs
-✅ Add songs vào artist
-✅ Remove songs khỏi artist (long press)
-✅ Auto update artist_name_string của song
-
-===============================================
-FLOW QUAN TRỌNG
-===============================================
-
-1. Add Song vào Artist:
-   - linkSongArtist(songId, artistId)
-   - Update artist_name_string của song
-   - Ví dụ: Song "Stay" add vào "Justin Bieber"
-     → artist_name_string = "Justin Bieber"
-
-2. Add Song vào nhiều Artists:
-   - Song "Stay" add vào "Justin Bieber"
-   - Song "Stay" add vào "The Kid LAROI"
-   → artist_name_string = "Justin Bieber & The Kid LAROI"
-
-3. Remove Song khỏi Artist:
-   - unlinkSongArtist(songId, artistId)
-   - Update lại artist_name_string
-   - Ví dụ: Remove "The Kid LAROI" khỏi "Stay"
-     → artist_name_string = "Justin Bieber"
-
-===============================================
-updateSongArtistString() LOGIC
-===============================================
-
-const updateSongArtistString = songId => {
-  // 1. Lấy tất cả artists của song
-  const artists = getArtistsBySong(songId);
-  
-  // 2. Join names: ["Ed Sheeran", "Taylor Swift"] → "Ed Sheeran & Taylor Swift"
-  const artistString = artists.map(a => a.name).join(' & ');
-  
-  // 3. Update song
-  updateSong(songId, { artist_name_string: artistString });
-};
-
-===============================================
-DATABASE HELPER FUNCTIONS CẦN CÓ
-===============================================
-
-Trong db.js cần thêm:
-
-export const updateArtist = (id, updates) => {
-  const { name, cover_image_path } = updates;
-  const fields = [];
-  const values = [];
-
-  if (name !== undefined) {
-    fields.push('name = ?');
-    values.push(name);
-  }
-  if (cover_image_path !== undefined) {
-    fields.push('cover_image_path = ?');
-    values.push(cover_image_path);
-  }
-
-  if (fields.length === 0) return false;
-
-  values.push(id);
-  db.execute(`UPDATE Artists SET ${fields.join(', ')} WHERE id = ?`, values);
-  return true;
-};
-
-export const deleteArtist = (id) => {
-  try {
-    db.execute('DELETE FROM Artists WHERE id = ?', [id]);
-    return true;
-  } catch (error) {
-    console.error('Error deleting artist:', error);
-    return false;
-  }
-};
-*/

@@ -8,6 +8,7 @@ import GenresScreen from '../screens/GenresScreen';
 import PlaylistsScreen from '../screens/PlaylistsScreen';
 import SongsScreen from '../screens/SongsScreen';
 import ArtistsScreen from '../screens/ArtistsScreen';
+import OnlineMusicScreen from '../screens/OnlineMusicScreen.jsx';
 
 const Tab = createBottomTabNavigator();
 
@@ -67,6 +68,15 @@ const AppNavigator = () => {
         options={{
           tabBarIcon: ({ color, size }) => (
             <Icon name="person" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Online"
+        component={OnlineMusicScreen}
+        options={{
+          tabBarIcon: ({color, size}) => (
+            <Icon name="musical-note" size={size} color={color} />
           ),
         }}
       />

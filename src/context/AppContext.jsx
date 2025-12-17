@@ -111,7 +111,7 @@ export const AppProvider = ({ children }) => {
   // Play a song or list of songs
   const playSong = (song, songList = []) => {
     try {
-      console.log('🎵 Playing song:', song.title, 'Path:', song.path);
+      console.log('Playing song:', song.title, 'Path:', song.path);
 
       // Release previous sound
       if (soundRef.current) {
@@ -131,22 +131,22 @@ export const AppProvider = ({ children }) => {
       // Create new sound instance
       const sound = new Sound(song.path, '', error => {
         if (error) {
-          console.error('❌ Failed to load sound:', error);
+          console.error('Failed to load sound:', error);
           console.error('Path:', song.path);
           return;
         }
 
-        console.log('✅ Sound loaded successfully');
+        console.log('Sound loaded successfully');
         const duration = sound.getDuration();
         setProgress({ position: 0, duration });
 
         // Play sound
         sound.play(success => {
           if (success) {
-            console.log('✅ Playback finished');
+            console.log('Playback finished');
             handleSongEnd();
           } else {
-            console.error('❌ Playback failed');
+            console.error('Playback failed');
           }
         });
 
@@ -162,7 +162,7 @@ export const AppProvider = ({ children }) => {
       // Save last played song
       AsyncStorage.setItem('lastPlayedSong', String(song.id));
     } catch (error) {
-      console.error('❌ Error playing song:', error);
+      console.error('Error playing song:', error);
     }
   };
 

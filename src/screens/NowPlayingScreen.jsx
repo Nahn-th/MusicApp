@@ -18,6 +18,7 @@ import {
     getAllPlaylists,
     addSongToPlaylist,
 } from '../database/db';
+import QueueScreen from './QueueScreen.jsx';
 
 const NowPlayingScreen = () => {
     const navigation = useNavigation();
@@ -36,6 +37,7 @@ const NowPlayingScreen = () => {
         progress,
     } = useApp();
     const [genres, setGenres] = useState([]);
+    const [showQueue, setShowQueue] = useState(false); 
 
     useEffect(() => {
         if (currentTrack) {
@@ -65,10 +67,6 @@ const NowPlayingScreen = () => {
         }
         const genreNames = genres.map(g => g.name).join(', ');
         Alert.alert('Genres', genreNames);
-    };
-
-    const handleAddToPlaylist = () => {
-        Alert.alert('Add to Playlist', 'This feature will be implemented soon.');
     };
 
     const getRepeatIcon = () => {
@@ -247,15 +245,21 @@ const NowPlayingScreen = () => {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            onPress={handleAddToPlaylist}
+                            onPress={() => setShowQueue(true)}
                             style={styles.bottomButton}
                         >
                             <Icon
-                                name="add-circle-outline"
+                                name="list"
                                 size={24}
                                 color={colors.textPrimary}
                             />
                         </TouchableOpacity>
+                        
+                        <QueueScreen
+                          visible={showQueue}
+                          onClose={() => setShowQueue(false)}
+                        />
+
                     </View>
                 </View>
             </ScrollView>
