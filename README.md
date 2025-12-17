@@ -151,7 +151,6 @@ adb devices
 
 **Nahn**
 📧 <nhanteo258@gmail.com>
-💡 “Vibe coder”
 
 ---
 
