@@ -27,7 +27,6 @@ const MiniPlayer = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* Thin progress bar at top */}
       <View style={styles.progressBarContainer}>
         <View
           style={[
@@ -40,7 +39,6 @@ const MiniPlayer = () => {
         />
       </View>
 
-      {/* Main content */}
       <TouchableOpacity
         style={styles.content}
         onPress={handlePlayerPress}
